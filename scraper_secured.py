@@ -12,7 +12,10 @@ print("Python:", sys.version)
 print("Starting...")
 
 BASE_URL = "https://mops.twse.com.tw"
-KEYWORD = "\u6709\u64d4\u4fdd\u53ef\u8f49\u63db\u516c\u53f8\u50b5"
+KEYWORDS = [
+    "\u6709\u64d4\u4fdd\u8f49\u63db\u516c\u53f8\u50b5",   # 有擔保轉換公司債
+    "\u6709\u64d4\u4fdd\u53ef\u8f49\u63db\u516c\u53f8\u50b5",  # 有擔保可轉換公司債
+]
 DATA_FILE = "data_secured.json"
 KEEP_MONTHS = 3
 
@@ -39,7 +42,9 @@ def decode_response(resp):
             continue
     return resp.text
 
-def search_market(market_type, year):
+def search_market(market_type, year, keyword=None):
+    if keyword is None:
+        keyword = KEYWORDS[0]
     kind = "L" if market_type == "sii" else "O"
     market_label = "\u4e0a\u5e02" if market_type == "sii" else "\u4e0a\u6ac3"
     print("Searching:", market_label, "year:", year)
@@ -49,7 +54,7 @@ def search_market(market_type, year):
         "apiName": "ajax_t51sb10",
         "parameters": {
             "r1": "1",
-            "keyWord": KEYWORD,
+            "keyWord": keyword,
             "keyWord2": "",
             "year": str(year),
             "Orderby": "1",
@@ -178,16 +183,16 @@ def main():
     print("ROC Year:", year)
 
     new_records = []
-    for market in ["sii", "otc"]:
-        new_records += search_market(market, year)
-        time.sleep(2)
-
-    now = datetime.now()
-    if now.month <= 3:
-        print("\nAlso fetching previous year...")
+    for kw in KEYWORDS:
+        print(f"\n=== Keyword: {kw} ===")
         for market in ["sii", "otc"]:
-            new_records += search_market(market, year - 1)
+            new_records += search_market(market, year, keyword=kw)
             time.sleep(2)
+        if datetime.now().month <= 3:
+            print("Also fetching previous year...")
+            for market in ["sii", "otc"]:
+                new_records += search_market(market, year - 1, keyword=kw)
+                time.sleep(2)
 
     print("\nMerging with existing records...")
     old_records = load_existing()
@@ -203,7 +208,7 @@ def main():
     output = {
         "year": year,
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M UTC+8"),
-        "keyword": KEYWORD,
+        "keywords": KEYWORDS,
         "keep_months": KEEP_MONTHS,
         "total": len(filtered),
         "records": filtered,
